@@ -236,6 +236,28 @@ export class ChatPanel implements vscode.WebviewViewProvider {
       }
     }
 
+    // Auto-inject local imports of the active file (skip if @mentions already filled the budget)
+    if (mentionedPaths.length < 3) {
+      const activeCtx = this.ctxBuilder.buildContext();
+
+      if (activeCtx) {
+        const importedPaths = this.ctxBuilder.extractLocalImports(activeCtx.fileContent, activeCtx.filePath);
+
+        // Exclude any paths already included via @mentions
+        const mentionedSet = new Set(mentionedPaths);
+        const newImports = importedPaths.filter((p) => !mentionedSet.has(p));
+
+        if (newImports.length > 0) {
+          const importedFiles = this.ctxBuilder.readMultipleFiles(newImports);
+
+          if (importedFiles.length > 0) {
+            const importedContext = this.ctxBuilder.formatMultipleFiles(importedFiles);
+            fileContext = (fileContext ?? "") + "\n\n--- IMPORTED FILES ---\n" + importedContext;
+          }
+        }
+      }
+    }
+
     // Use full session history as messages array, with summarization if needed
     const allHistory: Message[] = memory
       ? memory.getRecentMessages(50).map((m: MemoryMessage) => ({

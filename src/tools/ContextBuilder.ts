@@ -132,6 +132,70 @@ export default class ContextBuilder {
     }
   }
 
+  public extractLocalImports(fileContent: string, currentFilePath: string): string[] {
+    const dir = path.dirname(currentFilePath);
+    const EXTENSIONS = [".ts", ".tsx", ".js", ".jsx"];
+    const seen = new Set<string>();
+    const resolved: string[] = [];
+
+    const importRe = /from\s+['"]([^'"]+)['"]/g;
+    const requireRe = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+
+    const tryResolve = (specifier: string): void => {
+      if (!specifier.startsWith("./") && !specifier.startsWith("../")) {
+        return;
+      }
+
+      const base = path.resolve(dir, specifier);
+
+      // Try as-is first (already has extension)
+      if (fs.existsSync(base) && !fs.statSync(base).isDirectory()) {
+        if (!seen.has(base)) {
+          seen.add(base);
+          resolved.push(base);
+        }
+
+        return;
+      }
+
+      // Try with each extension
+      for (const ext of EXTENSIONS) {
+        const candidate = base + ext;
+
+        if (fs.existsSync(candidate)) {
+          if (!seen.has(candidate)) {
+            seen.add(candidate);
+            resolved.push(candidate);
+          }
+
+          return;
+        }
+      }
+    };
+
+    let match: RegExpExecArray | null;
+
+    while ((match = importRe.exec(fileContent)) !== null) {
+      if (resolved.length >= 3) {
+        break;
+      }
+
+      tryResolve(match[1]);
+    }
+
+    if (resolved.length < 3) {
+      while ((match = requireRe.exec(fileContent)) !== null) {
+        if (resolved.length >= 3) {
+          break;
+        }
+
+        tryResolve(match[1]);
+      }
+    }
+
+    return resolved;
+  }
+
   public extractMentions(userMessage: string): string[] {
     const folders = vscode.workspace.workspaceFolders;
 
