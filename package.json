@@ -1,133 +1,114 @@
 {
-  "name": "fax-ai",
-  "displayName": "fax-ai",
-  "publisher": "fax-ai",
-  "description": "A professional AI coding assistant with sidebar chat and code writing capabilities.",
+  "name": "codex-local",
+  "displayName": "Codex Local",
+  "description": "A local AI coding assistant running inside the VS Code sidebar.",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Other"
   ],
   "activationEvents": [
-    "onCommand:ai.explainCode",
-    "onCommand:ai.fixCode",
-    "onCommand:ai.addComments",
-    "onCommand:ai.genTests",
-    "onCommand:ai.listModels",
-    "onView:faxAi.chatView"
+    "onStartupFinished",
+    "onView:codexLocal.chatView"
   ],
-  "main": "./dist/extension.js",
+  "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "fax-ai-sidebar",
-          "title": "fax-ai",
-          "name": "fax-ai",
+          "id": "codexLocalSidebar",
+          "title": "Codex Local",
           "icon": "$(sparkle)"
         }
       ]
     },
     "views": {
-      "fax-ai-sidebar": [
+      "codexLocalSidebar": [
         {
-          "id": "faxAi.chatView",
+          "id": "codexLocal.chatView",
           "type": "webview",
-          "name": "fax-ai Chat",
-          "title": "fax-ai Chat"
+          "name": "Codex Local"
         }
       ]
     },
     "commands": [
       {
-        "command": "ai.explainCode",
-        "title": "fax-ai: Explain Code"
+        "command": "codexLocal.openChat",
+        "title": "Codex Local: Open Chat"
       },
       {
-        "command": "ai.fixCode",
-        "title": "fax-ai: Fix Code"
+        "command": "codexLocal.explainCode",
+        "title": "Codex Local: Explain Code"
       },
       {
-        "command": "ai.addComments",
-        "title": "fax-ai: Add Comments"
+        "command": "codexLocal.fixCode",
+        "title": "Codex Local: Fix Code"
       },
       {
-        "command": "ai.genTests",
-        "title": "fax-ai: Generate Tests"
-      },
-      {
-        "command": "ai.listModels",
-        "title": "fax-ai: List Models"
-      },
-      {
-        "command": "ai.applyCode",
-        "title": "fax-ai: Apply to Editor"
-      },
-      {
-        "command": "ai.editCode",
-        "title": "fax-ai: Edit with AI"
+        "command": "codexLocal.clearHistory",
+        "title": "Codex Local: Clear History"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "command": "ai.editCode",
-          "group": "navigation",
-          "when": "editorHasSelection"
+          "command": "codexLocal.explainCode",
+          "when": "editorHasSelection",
+          "group": "codexLocal@1"
         },
         {
-          "command": "ai.explainCode",
-          "group": "navigation"
+          "command": "codexLocal.fixCode",
+          "when": "editorHasSelection",
+          "group": "codexLocal@2"
         }
       ]
     },
     "configuration": {
-      "title": "fax-ai",
+      "title": "Codex Local",
       "properties": {
-        "faxAi.endpoint": {
+        "codexLocal.ollamaHost": {
           "type": "string",
           "default": "http://localhost:11434",
-          "description": "Base URL of your local AI server. Ollama: http://localhost:11434 | Open WebUI: http://localhost:3000 | LM Studio: http://localhost:1234"
+          "description": "URL where Ollama is running. Default: http://localhost:11434. Change this only if you are running Ollama on a different port or a remote machine."
         },
-        "faxAi.model": {
+        "codexLocal.model": {
           "type": "string",
-          "default": "gemma:4b",
-          "description": "Model name to use for completions."
+          "default": "gemma4:e2b",
+          "description": "Ollama model name to use. Default: gemma4:e2b. Must match exactly what you see in: ollama list"
         },
-        "faxAi.apiKey": {
-          "type": "string",
-          "default": "",
-          "description": "API key / Bearer token (leave empty if your server doesn't require one)."
+        "codexLocal.maxHistoryMessages": {
+          "type": "number",
+          "default": 50,
+          "minimum": 5,
+          "maximum": 200,
+          "description": "Number of past messages included in each request for conversation context. Default: 50. Lower this if responses are slow."
+        },
+        "codexLocal.contextLines": {
+          "type": "number",
+          "default": 200,
+          "minimum": 10,
+          "maximum": 1000,
+          "description": "Maximum lines of the active file included as context in each request. Default: 200. Lower this for large files."
         }
       }
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run package",
-    "compile": "npm run check-types && npm run lint && node esbuild.js",
-    "watch": "npm-run-all -p watch:*",
-    "watch:esbuild": "node esbuild.js --watch",
-    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package": "npm run check-types && npm run lint && node esbuild.js --production",
-    "compile-tests": "tsc -p . --outDir out",
-    "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run lint",
-    "check-types": "tsc --noEmit",
-    "lint": "eslint src",
-    "test": "vscode-test"
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ollama": "^0.5.17",
+    "sql.js": "^1.14.1"
   },
   "devDependencies": {
-    "@types/mocha": "^10.0.10",
-    "@types/node": "22.x",
-    "@types/vscode": "^1.100.0",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
-    "esbuild": "^0.27.3",
-    "eslint": "^9.39.3",
-    "npm-run-all": "^4.1.5",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1"
+    "@types/node": "^22.19.19",
+    "@types/sql.js": "^1.4.11",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.9.3"
   }
 }
