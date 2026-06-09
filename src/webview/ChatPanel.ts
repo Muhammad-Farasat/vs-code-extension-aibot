@@ -224,6 +224,18 @@ export class ChatPanel implements vscode.WebviewViewProvider {
       }
     }
 
+    // Append any @mentioned files to context
+    const mentionedPaths = this.ctxBuilder.extractMentions(text);
+
+    if (mentionedPaths.length > 0) {
+      const mentionedFiles = this.ctxBuilder.readMultipleFiles(mentionedPaths);
+
+      if (mentionedFiles.length > 0) {
+        const mentionedContext = this.ctxBuilder.formatMultipleFiles(mentionedFiles);
+        fileContext = (fileContext ?? "") + "\n\n--- MENTIONED FILES ---\n" + mentionedContext;
+      }
+    }
+
     // Use full session history as messages array, with summarization if needed
     const allHistory: Message[] = memory
       ? memory.getRecentMessages(50).map((m: MemoryMessage) => ({

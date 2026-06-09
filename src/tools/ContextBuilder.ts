@@ -132,6 +132,77 @@ export default class ContextBuilder {
     }
   }
 
+  public extractMentions(userMessage: string): string[] {
+    const folders = vscode.workspace.workspaceFolders;
+
+    if (!folders || folders.length === 0) {
+      return [];
+    }
+
+    const rootPath = folders[0].uri.fsPath;
+    const regex = /@([\w./\\-]+)/g;
+    const resolved: string[] = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(userMessage)) !== null) {
+      const mention = match[1];
+      const candidates = [
+        path.resolve(rootPath, mention),
+        path.resolve(rootPath, "src", mention),
+        path.resolve(rootPath, "src", "lib", mention),
+      ];
+
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+          resolved.push(candidate);
+          break;
+        }
+      }
+    }
+
+    return resolved;
+  }
+
+  public readMultipleFiles(filePaths: string[]): Array<{ path: string; relativePath: string; language: string; content: string }> {
+    const folders = vscode.workspace.workspaceFolders;
+    const rootPath = folders && folders.length > 0 ? folders[0].uri.fsPath : "";
+
+    const EXT_LANGUAGE: Record<string, string> = {
+      ".ts": "typescript",
+      ".tsx": "typescript",
+      ".js": "javascript",
+      ".jsx": "javascript",
+      ".py": "python",
+      ".json": "json",
+      ".md": "markdown",
+      ".css": "css",
+    };
+
+    const results: Array<{ path: string; relativePath: string; language: string; content: string }> = [];
+    const capped = filePaths.slice(0, 5);
+
+    for (const filePath of capped) {
+      try {
+        const content = fs.readFileSync(filePath, "utf-8");
+        const ext = path.extname(filePath).toLowerCase();
+        const language = EXT_LANGUAGE[ext] ?? "plaintext";
+        const relativePath = rootPath ? path.relative(rootPath, filePath) : path.basename(filePath);
+
+        results.push({ path: filePath, relativePath, language, content });
+      } catch {
+        // skip unreadable files
+      }
+    }
+
+    return results;
+  }
+
+  public formatMultipleFiles(files: Array<{ path: string; relativePath: string; language: string; content: string }>): string {
+    return files
+      .map((f) => `--- FILE: ${f.relativePath} ---\n\`\`\`${f.language}\n${f.content}\n\`\`\`\n--- END ${f.relativePath} ---`)
+      .join("\n\n");
+  }
+
   private getDiagnostics(uri: vscode.Uri): string | undefined {
     const diagnostics = vscode.languages.getDiagnostics(uri);
 
