@@ -162,6 +162,10 @@ export class ChatPanel implements vscode.WebviewViewProvider {
       if (message.type === "stopStream") {
         this.ollama.stopStream();
       }
+
+      if (message.type === "analyzeProject") {
+        await vscode.commands.executeCommand("codexLocal.analyzeProject");
+      }
     });
   }
 
@@ -580,6 +584,7 @@ export class ChatPanel implements vscode.WebviewViewProvider {
       <button class="icon-btn" id="history-btn" type="button" title="History">🕓</button>
       <button class="icon-btn" id="new-session-btn" type="button" title="New session">＋</button>
       <button class="icon-btn" id="clear-chat-btn" type="button" title="Clear chat">🗑</button>
+      <button class="icon-btn" id="btn-analyze" type="button" title="Analyze Project">🔍</button>
     </div>
   </header>
 
@@ -614,6 +619,7 @@ export class ChatPanel implements vscode.WebviewViewProvider {
     const newSessionBtn = document.getElementById("new-session-btn");
     const historyPanel = document.getElementById("history-panel");
     const sessionList = document.getElementById("session-list");
+    const btnAnalyze = document.getElementById("btn-analyze");
     let currentAssistantEl = null;
 
     function appendMessage(role, text) {
@@ -680,6 +686,10 @@ export class ChatPanel implements vscode.WebviewViewProvider {
 
     clearChatBtn.addEventListener("click", () => {
       vscode.postMessage({ type: "clearHistory" });
+    });
+
+    btnAnalyze.addEventListener("click", () => {
+      vscode.postMessage({ type: "analyzeProject" });
     });
 
     input.addEventListener("input", resizeInput);

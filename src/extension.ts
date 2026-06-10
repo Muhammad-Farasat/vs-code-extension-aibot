@@ -157,6 +157,33 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand("codexLocal.analyzeProject", async () => {
+      const memory = await memoryPromise;
+      const THIRTY_MINUTES = 30 * 60 * 1000;
+
+      const cached = memory.getProjectSummary();
+      const isFresh = cached !== null && (Date.now() - cached.scannedAt) < THIRTY_MINUTES;
+
+      let summary;
+
+      if (isFresh && cached !== null) {
+        summary = cached;
+      } else {
+        await vscode.window.showInformationMessage("Codex Local: Scanning project files...");
+        summary = await contextBuilder.summarizeProject();
+        memory.saveProjectSummary(summary);
+      }
+
+      const formatted = contextBuilder.formatProjectSummary(summary);
+      const result = await ollamaProvider.analyzeProject(formatted);
+
+      await chatPanel.sendToWebview({ type: "startAssistant" });
+      await chatPanel.sendToWebview({ type: "appendAssistant", content: result });
+      await chatPanel.sendToWebview({ type: "doneAssistant" });
+    }),
+  );
+
   void checkOllamaConnection(ollamaProvider).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : "Unknown startup error";
 

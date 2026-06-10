@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import initSqlJs from "sql.js";
+import type { ProjectSummary } from "../tools/ContextBuilder";
 
 export interface Message {
   id?: number;
@@ -158,6 +159,31 @@ export default class MemoryManager {
     this.db.close();
   }
 
+  public saveProjectSummary(summary: ProjectSummary): void {
+    this.db.run(
+      "INSERT OR REPLACE INTO project_cache (key, value, updated_at) VALUES (?, ?, ?)",
+      ["project_summary", JSON.stringify(summary), Date.now()],
+    );
+    this.persistToDisk();
+  }
+
+  public getProjectSummary(): ProjectSummary | null {
+    const row = this.get(
+      "SELECT value FROM project_cache WHERE key = ?",
+      ["project_summary"],
+    );
+
+    if (!row.value || typeof row.value !== "string") {
+      return null;
+    }
+
+    try {
+      return JSON.parse(row.value) as ProjectSummary;
+    } catch {
+      return null;
+    }
+  }
+
   private initSchema(): void {
     this.db.run(`
       CREATE TABLE IF NOT EXISTS sessions (
@@ -179,6 +205,13 @@ export default class MemoryManager {
     `);
     this.db.run("CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id)");
     this.db.run("CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp)");
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS project_cache (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
     this.ensureActiveSession();
   }
 

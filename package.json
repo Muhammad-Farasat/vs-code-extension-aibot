@@ -49,6 +49,10 @@
       {
         "command": "codexLocal.clearHistory",
         "title": "Codex Local: Clear History"
+      },
+      {
+        "command": "codexLocal.analyzeProject",
+        "title": "Codex Local: Analyze Project"
       }
     ],
     "menus": {

@@ -12,6 +12,19 @@ export interface CodeContext {
   diagnostics: string | undefined;
 }
 
+export interface ProjectSummary {
+  totalFiles: number;
+  totalLines: number;
+  fileTree: string;
+  files: Array<{
+    relativePath: string;
+    language: string;
+    lineCount: number;
+    content: string;
+  }>;
+  scannedAt: number;
+}
+
 export default class ContextBuilder {
   public buildContext(): CodeContext | null {
     const editor = vscode.window.activeTextEditor;
@@ -130,6 +143,113 @@ export default class ContextBuilder {
     } catch {
       return null;
     }
+  }
+
+  public async summarizeProject(): Promise<ProjectSummary> {
+    const folders = vscode.workspace.workspaceFolders;
+    const rootPath = folders && folders.length > 0 ? folders[0].uri.fsPath : "";
+
+    const SKIPPED_DIRS = new Set([
+      "node_modules", ".git", "out", "dist", ".next", "build", "coverage",
+    ]);
+
+    const ALLOWED_EXTENSIONS = new Set([
+      ".ts", ".tsx", ".js", ".jsx", ".py", ".json", ".md",
+      ".css", ".html", ".env.example",
+    ]);
+
+    const EXT_LANGUAGE: Record<string, string> = {
+      ".ts": "typescript", ".tsx": "typescript",
+      ".js": "javascript", ".jsx": "javascript",
+      ".py": "python", ".json": "json",
+      ".md": "markdown", ".css": "css",
+      ".html": "html", ".example": "plaintext",
+    };
+
+    const MAX_FILE_SIZE = 50 * 1024; // 50 KB
+    const MAX_FILES = 80;
+
+    const files: ProjectSummary["files"] = [];
+
+    const walk = (dirPath: string): void => {
+      if (files.length >= MAX_FILES) {
+        return;
+      }
+
+      let entries: fs.Dirent[];
+
+      try {
+        entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      } catch {
+        return;
+      }
+
+      for (const entry of entries) {
+        if (files.length >= MAX_FILES) {
+          break;
+        }
+
+        if (entry.name.startsWith(".") || SKIPPED_DIRS.has(entry.name)) {
+          continue;
+        }
+
+        const fullPath = path.join(dirPath, entry.name);
+
+        if (entry.isDirectory()) {
+          walk(fullPath);
+        } else if (entry.isFile()) {
+          const ext = path.extname(entry.name).toLowerCase();
+
+          // Handle .env.example specifically
+          const effectiveExt = entry.name === ".env.example" ? ".example" : ext;
+
+          if (!ALLOWED_EXTENSIONS.has(effectiveExt === ".example" ? ".env.example" : effectiveExt)) {
+            continue;
+          }
+
+          try {
+            const stat = fs.statSync(fullPath);
+
+            if (stat.size > MAX_FILE_SIZE) {
+              continue;
+            }
+
+            const content = fs.readFileSync(fullPath, "utf-8");
+            const lineCount = content.split("\n").length;
+            const relativePath = rootPath ? path.relative(rootPath, fullPath) : entry.name;
+            const language = EXT_LANGUAGE[effectiveExt] ?? "plaintext";
+
+            files.push({ relativePath, language, lineCount, content });
+          } catch {
+            // skip unreadable
+          }
+        }
+      }
+    };
+
+    if (rootPath) {
+      walk(rootPath);
+    }
+
+    const totalLines = files.reduce((sum, f) => sum + f.lineCount, 0);
+
+    return {
+      totalFiles: files.length,
+      totalLines,
+      fileTree: this.getWorkspaceTree(100),
+      files,
+      scannedAt: Date.now(),
+    };
+  }
+
+  public formatProjectSummary(summary: ProjectSummary): string {
+    const header = `Project has ${summary.totalFiles} files, ${summary.totalLines} total lines`;
+    const tree = summary.fileTree;
+    const fileSections = summary.files
+      .map((f) => `### ${f.relativePath} (${f.lineCount} lines)\n\`\`\`${f.language}\n${f.content}\n\`\`\``)
+      .join("\n\n");
+
+    return [header, tree, fileSections].join("\n\n");
   }
 
   public extractLocalImports(fileContent: string, currentFilePath: string): string[] {

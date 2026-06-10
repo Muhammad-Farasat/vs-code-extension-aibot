@@ -231,6 +231,42 @@ ${conversation}`;
     }
   }
 
+  public async analyzeProject(projectSummary: string): Promise<string> {
+    const { client, model } = createClient();
+
+    const prompt = `You are analyzing a software project for a developer.
+Below is the full project structure and source code.
+${projectSummary}
+
+Provide a structured analysis covering:
+1. Project type and purpose — what does this project do?
+2. Tech stack — what frameworks, libraries, and tools are used?
+3. Architecture — how is the code organized and why?
+4. Key files — which files are most important and what do they own?
+5. Potential issues — any obvious bugs, anti-patterns, or areas of concern?
+6. Suggestions — top 3 improvements you would recommend?
+
+Be specific. Reference actual file names and code from the project.`;
+
+    try {
+      const response = await client.chat({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        stream: false,
+        options: {
+          num_ctx: 8192,
+          temperature: 0.3,
+        },
+      });
+
+      return response.message.content.trim();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+
+      return `❌ Project analysis failed: ${message}`;
+    }
+  }
+
   public detectFileCreationIntent(userMessage: string): boolean {
     const signals = [
       "create a file",
